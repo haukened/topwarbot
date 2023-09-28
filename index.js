@@ -9,7 +9,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
 const { token } = require('./config.json');
-const { DeployCommands } = require('./deploy-commands');
+const { DeployCommands, ClearCommands } = require('./deploy-commands');
+const beforeShutdown = require('./before-shutdown');
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]});
 
@@ -34,6 +35,9 @@ for (const folder of commandFolders) {
         }
     }
 }
+
+// register shutdown cleanup
+beforeShutdown(() => ClearCommands());
 
 // run on startup, one time
 client.once(Events.ClientReady, async c => {

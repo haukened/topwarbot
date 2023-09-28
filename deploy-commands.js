@@ -46,8 +46,37 @@ async function DeployCommandsGuild(commands) {
     }
 }
 
+async function ClearCommandsGlobal() {
+    const rest = new REST().setToken(token);
+    try {
+        console.log(`Started clearing commands`)
+        await rest.put(
+            Routes.applicationCommands(client_id),
+            { body: [] },
+        );
+        console.log(`Commands cleared`)
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+async function ClearCommandsGuild() {
+    const rest = new REST().setToken(token);
+    try {
+        console.log(`Started clearing commands`)
+        await rest.put(
+            Routes.applicationGuildCommands(client_id, dev_guild),
+            { body: [] },
+        );
+        console.log(`Commands cleared`)
+    } catch (error) {
+        console.error(error);
+    }
+}
+
 // store the export in an object so we can change it on the fly
 const mode = {};
 module.exports = mode;
 // then determine if we're in development mode and export the dev one if we are.
 mode.DeployCommands = IS_DEV() ? DeployCommandsGuild : DeployCommandsGlobal;
+mode.ClearCommands = IS_DEV() ? ClearCommandsGuild : ClearCommandsGlobal;
