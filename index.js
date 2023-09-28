@@ -37,6 +37,7 @@ for (const folder of commandFolders) {
 }
 
 // register shutdown cleanup
+// this can be run multiple times to perform any additional shutdown tasks
 beforeShutdown(() => ClearCommands());
 
 // run on startup, one time
