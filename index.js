@@ -4,13 +4,17 @@
  * Copyright (c) 2023 David Haukeness
  * Distributed under the terms of the GNU GENERAL PUBLIC LICENSE Version 3.0
  */
+global.__basedir = __dirname;
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, Events, GatewayIntentBits, ActivityType } = require('discord.js');
 const { token } = require('./config.json');
 const { DeployCommands, ClearCommands } = require('./deploy-commands');
 const beforeShutdown = require('./before-shutdown');
+const db = require('./database/sqlite3');
+
+db.Init();
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]});
 
@@ -39,11 +43,26 @@ for (const folder of commandFolders) {
 // register shutdown cleanup
 // this can be run multiple times to perform any additional shutdown tasks
 beforeShutdown(() => ClearCommands());
+beforeShutdown(() => client.user.setPresence({
+    activities: [{
+        type: ActivityType.Custom,
+        name: 'Offline for Maintenance',
+        state: 'Offline for Maintenance'
+    }],
+    status: 'dnd'
+}))
 
 // run on startup, one time
 client.once(Events.ClientReady, async c => {
     console.log(`Ready! Logged in as ${c.user.tag}`);
     await DeployCommands(commandsToRegister);
+    client.user.setPresence({
+        activities: [{
+            name: 'Top War',
+            type: ActivityType.Playing,
+        }],
+        status: 'online'
+    })
 })
 
 // run on every interaction. This is essentially an event dispatcher for command handlers
