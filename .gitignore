@@ -7,6 +7,8 @@ config.json
 # databases
 *.sql
 *.sqlite
+*-shm
+*-wal
 *.sqlite3
 *.db
 *.db3
