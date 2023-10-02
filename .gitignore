@@ -4,6 +4,15 @@
 # configuration
 config.json
 
+# databases
+*.sql
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.s3db
+*.sl3
+
 # Logs
 logs
 *.log
