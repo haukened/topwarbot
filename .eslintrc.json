@@ -10,5 +10,8 @@
         "ecmaVersion": "latest"
     },
     "rules": {
+    },
+    "globals": {
+        "__basedir": true
     }
 }
