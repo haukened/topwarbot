@@ -12,11 +12,11 @@ const { Client, Collection, Events, GatewayIntentBits, ActivityType } = require(
 const { token } = require('./config.json');
 const { DeployCommands, ClearCommands } = require('./deploy-commands');
 const beforeShutdown = require('./before-shutdown');
-const db = require('./database/sqlite3');
 
-db.Init();
+// make sure the database is required once to initialize
+require("./database/sqlite");
 
-const client = new Client({intents: [GatewayIntentBits.Guilds]});
+const client = new Client({intents: [GatewayIntentBits.Guilds], disableEveryone: false});
 
 client.commands = new Collection();
 let commandsToRegister = [];
@@ -62,7 +62,7 @@ client.once(Events.ClientReady, async c => {
             type: ActivityType.Playing,
         }],
         status: 'online'
-    })
+    });
 })
 
 // run on every interaction. This is essentially an event dispatcher for command handlers
