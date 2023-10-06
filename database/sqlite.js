@@ -9,14 +9,31 @@ const path = require('node:path');
 const { database } = require('../config.json');
 const database_path = path.join(__basedir, database)
 const { Sequelize, DataTypes } = require('sequelize');
+const EventEmitter = require('events');
+require('./snowflake');
 
 const sq = new Sequelize(`sqlite:${database_path}`, {logging: false});
+
+const bus = new EventEmitter();
+let initialized = false;
+
+function waitForDatabase() {
+    const poll = resolve => {
+        if(initialized) resolve();
+        else setTimeout(_ => poll(resolve), 100);
+    };
+    return new Promise(poll);
+}
 
 /**
  * Initializes the database and syncs modules to storage
  */
-console.log("Initializing database")
-sq.sync({alter: true})
+async function Sync() {
+    console.log("Initializing database");
+    await sq.sync();
+    initialized = true;
+    console.log("Finished syncing database");
+}
 
 /**
  * @typedef {object} Permission
@@ -28,7 +45,7 @@ sq.sync({alter: true})
  */
 const Permission = sq.define('Permission', {
     guild_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.SNOWFLAKE,
         allowNull: false
     },
     guild_name: {
@@ -36,7 +53,7 @@ const Permission = sq.define('Permission', {
         allowNull: false
     },
     role_id: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.SNOWFLAKE,
         allowNull: false,
     },
     role_name: {
@@ -118,55 +135,128 @@ async function ListPermission(guild_id, permission) {
 }
 
 /**
+ * Represents a one time notification Event
+ * @param {Date} when The Date of the event
+ */
+const Once = sq.define("Once", {
+    when: {
+        type: DataTypes.DATE,
+        allowNull: false
+    }
+});
+
+/**
+ * Represents a recurring schedule for an Event
+ * @param {string} schedule The cron-like schedule, as a string
+ */
+const Recurring = sq.define("Recurring", {
+    schedule: {
+        type: DataTypes.STRING,
+        allowNull: false
+    }
+})
+
+/**
  * Represents a singular event
  * @param {string} body The body of the notification
- * @param {number} createdBy The discord user ID
- * @param {string} note A handy note used in the reminder 
+ * @param {string} note A note about this notification's purpose
+ * @param {number} createdById The discord user ID
+ * @param {string} createdByName The discord username
+ * @param {number} channelId The discord channelId
+ * @param {number} notify The snowflake id of the mentionable group to notify
  */
-const Event = sq.define("Event", {
+const NotificationEvent = sq.define("Event", {
     body: {
         type: DataTypes.TEXT,
         allowNull: false
     },
-    createdBy: {
-        type: DataTypes.INTEGER,
-        allowNull: false
-    },
     note: {
         type: DataTypes.TEXT,
-        allowNull: true
-    },
-    channel_id: {
-        type: DataTypes.INTEGER,
         allowNull: false
     },
-    everyone: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: false
+    createdById: {
+        type: DataTypes.SNOWFLAKE,
+        allowNull: false
     },
-    role: {
-        type: DataTypes.INTEGER,
+    createdByName: {
+        type: DataTypes.TEXT,
+        allowNull: false,
+    },
+    channelId: {
+        type: DataTypes.SNOWFLAKE,
+        allowNull: false
+    },
+    notify: {
+        type: DataTypes.TEXT,
         allowNull: true,
     },
-    remind_role: {
-        type: DataTypes.INTEGER,
-        allowNull: true
-    },
-    remind_time: {
-        type: DataTypes.INTEGER,
-        allowNull: true
-    },
-    remind_channel: {
-        type: DataTypes.INTEGER,
-        allowNull: true
-    },
-})
+});
+
+/**
+ * creates a new Database backed NotificationEvent
+ * @param {string} body the body of the notification
+ * @param {string} note the title/subject of the notification
+ * @param {number} createdById the discord user ID
+ * @param {string} createdByName the discord username
+ * @param {number} channelId the channel ID to send notifications to
+ * @param {number} notify the mentionable group to notify
+ * @returns {NotificationEvent}
+ */
+async function CreateNotificationEvent(body, note, createdById, createdByName, channelId, notify) {
+    const n = await NotificationEvent.create({
+        body: body,
+        note: note,
+        createdById: createdById,
+        createdByName: createdByName,
+        channelId: channelId,
+        notify: notify
+    })
+    return n
+}
+
+/**
+ * removes a NotificationEvent
+ * @param {number} id the database id of the event
+ * @returns {number} number of rows affected
+ */
+async function DeleteNotificationEvent(id) {
+    const num = await NotificationEvent.destroy({
+        where: {
+            id: id
+        }
+    })
+    return num
+}
+
+/**
+ * fetches notification for a guild
+ * @param {number} guild_id the discord guild id
+ * @returns {Array<NotificationEvent>}
+ */
+async function ListNotificationEvents(guild_id) {
+    const rows = await NotificationEvent.findAll({
+        where: {
+            guild_id: guild_id
+        }
+    })
+    return rows;
+}
+
+// associations
+NotificationEvent.hasOne(Once, {onDelete: 'CASCADE'})
+NotificationEvent.hasOne(Recurring, {onDelete: 'CASCADE'})
+Once.belongsTo(NotificationEvent, {onDelete: 'CASCADE'});
+Recurring.belongsTo(NotificationEvent, {onDelete: 'CASCADE'})
 
 module.exports = {
     AddPermission: AddPermission,
-    Event: Event,
+    CreateNotificationEvent: CreateNotificationEvent,
+    NotificationEvent: NotificationEvent,
     ListAllPermissions: ListAllPermissions,
     ListPermission: ListPermission,
+    Once: Once,
+    Recurring: Recurring,
     RemovePermission: RemovePermission,
+    Sync: Sync,
+    waitForDatabase: waitForDatabase,
 };
