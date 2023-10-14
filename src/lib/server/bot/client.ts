@@ -7,15 +7,15 @@
 
 import { env } from '$env/dynamic/private';
 import { Client, Events, GatewayIntentBits, REST, Routes, type SlashCommandBuilder } from 'discord.js';
-import type { CommandInteraction, RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
+import type { ChatInputCommandInteraction, RESTPostAPIChatInputApplicationCommandsJSONBody } from 'discord.js';
 import { scheduleCommand, executeSchedule } from './commands/schedule';
 
 export class DiscordClient extends Client {
     #token: string|undefined = env.DISCORD_TOKEN;
     #appid: string|undefined = env.DISCORD_APPID;
     #guild: string|undefined = env.DISCORD_GUILD;
-    #functions = new Map<string,(interaction: CommandInteraction)=>Promise<void>>;
-    #commands = new Map<string,SlashCommandBuilder>;
+    #functions = new Map<string,(interaction: ChatInputCommandInteraction)=>Promise<void>>;
+    #commands = new Map<string,Omit<SlashCommandBuilder, "addSubcommand" | "addSubcommandGroup">>;
 
     constructor() {
         // set up the base client class
@@ -82,11 +82,12 @@ export class DiscordClient extends Client {
             }
             return Routes.applicationGuildCommands(this.#appid, this.#guild)
         }
-        
+
         return Routes.applicationCommands(this.#appid);
     }
 
     async register_commands() {
+        console.log('Registering discord slash commands');
         const route = this.getRoute();
         const cmds: RESTPostAPIChatInputApplicationCommandsJSONBody[] = [];
 
@@ -104,6 +105,24 @@ export class DiscordClient extends Client {
             await rest.put(
                 route,
                 { body: cmds }
+            )
+        } catch (error) {
+            console.error(error);
+        }
+        console.log(`Registered ${cmds.length} commands`)
+    }
+
+    async clear_commands() {
+        console.log('Clearing discord slash commands');
+        const route = this.getRoute();
+        if (this.#token === undefined) {
+            throw new Error("missing required environment variable DISCORD_TOKEN");
+        }
+        const rest = new REST().setToken(this.#token);
+        try {
+            await rest.put(
+                route,
+                { body: [] }
             )
         } catch (error) {
             console.error(error);
